@@ -91,13 +91,13 @@ func runGet(cCtx *cli.Context) error {
 			return err
 		}
 
-		if len(resp.GetObject().GetLogs()) == 0 {
-			time.Sleep(2 * time.Second)
-		}
-
 		pageInfo := resp.GetObject().GetPageInfo()
 		if pageInfo.GetNextPage() == "" {
 			break
+		}
+
+		if follow && len(resp.GetObject().GetLogs()) == 0 {
+			time.Sleep(2 * time.Second)
 		}
 
 		resp, err = resp.Next()
