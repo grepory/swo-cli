@@ -10,15 +10,20 @@ import (
 
 var version = "v1.3.2"
 
+const (
+	DefaultAPIURL     = "https://api.na-01.cloud.solarwinds.com"
+	DefaultConfigFile = "~/.swo-cli.yaml"
+)
+
 func main() {
 	app := &cli.App{
 		Name:    "swo",
 		Usage:   "SolarWinds Observability Command-Line Interface",
 		Version: version,
 		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "api-url", Usage: "URL of the SWO API", Value: logs.DefaultAPIURL},
+			&cli.StringFlag{Name: "api-url", Usage: "URL of the SWO API", Value: DefaultAPIURL},
 			&cli.StringFlag{Name: "api-token", Usage: "API token"},
-			&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "path to config", Value: logs.DefaultConfigFile},
+			&cli.StringFlag{Name: "config", Aliases: []string{"c"}, Usage: "path to config", Value: DefaultConfigFile},
 		},
 		Commands: []*cli.Command{
 			logs.NewLogsCommand(),

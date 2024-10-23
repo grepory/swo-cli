@@ -11,10 +11,13 @@ require (
 
 require (
 	github.com/AlekSi/pointer v1.0.0 // indirect
+	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/ericlagergren/decimal v0.0.0-20221120152707-495c53812d05
 	github.com/pkg/errors v0.8.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/spyzhov/ajson v0.8.0
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 )

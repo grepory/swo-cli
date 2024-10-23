@@ -3,17 +3,19 @@ package logs
 import (
 	"errors"
 	"fmt"
+	"github.com/olebedev/when"
+	"github.com/urfave/cli/v2"
+	"gopkg.in/yaml.v3"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/olebedev/when"
-	"gopkg.in/yaml.v3"
 )
 
 var (
+	ErrInvalidDateTime = errors.New("Could not parse timestamp")
+
 	now = time.Now()
 
 	errMinTimeFlag  = errors.New("failed to parse --min-time flag")
@@ -43,84 +45,48 @@ var (
 	}
 )
 
-type Options struct {
-	args       []string
-	configFile string
-	group      string
-	system     string
-	maxTime    string
-	minTime    string
-	json       bool
-	follow     bool
-
+type Configuration struct {
 	APIURL string `yaml:"api-url"`
 	Token  string `yaml:"token"`
 }
 
-func (opts *Options) Init(args []string) error {
-	opts.args = args
-
-	if opts.minTime != "" {
-		result, err := parseTime(opts.minTime)
-		if err != nil {
-			return errors.Join(errMinTimeFlag, err)
-		}
-
-		opts.minTime = result
-	}
-
-	if opts.follow { // set maxTime to <now - 10s> when 'follow' flag is set, it is used only for the first request
-		result, err := parseTime(time.Now().Add(-10 * time.Second).Format(time.RFC3339))
-		if err != nil {
-			return errors.Join(errMaxTimeFlag, err)
-		}
-
-		opts.maxTime = result
-	}
-
-	if opts.maxTime != "" {
-		result, err := parseTime(opts.maxTime)
-		if err != nil {
-			return errors.Join(errMaxTimeFlag, err)
-		}
-
-		opts.maxTime = result
-	}
-
-	configPath := opts.configFile
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	localConfig := filepath.Join(cwd, ".swo-cli.yaml")
-	if _, err := os.Stat(localConfig); err == nil {
-		configPath = localConfig
-	} else if strings.HasPrefix(opts.configFile, "~/") {
+func configure(cCtx *cli.Context) (*Configuration, error) {
+	// TODO: We should refactor these references to cCtx into some kind of configuration package
+	// 	that creates a configuration object of some kind.
+	configPath := cCtx.String("config")
+	if strings.HasPrefix(configPath, "~/") {
 		usr, err := user.Current()
 		if err != nil {
-			return fmt.Errorf("error while resolving current user to read configuration file: %w", err)
+			return nil, fmt.Errorf("error while resolving current user to read configuration file: %w", err)
 		}
 
-		configPath = filepath.Join(usr.HomeDir, opts.configFile[2:])
+		dir, filename := filepath.Split(configPath)
+		dir = strings.TrimLeft(dir, "~/")
+		configPath = filepath.Join(usr.HomeDir, dir, filename)
 	}
 
+	configuration := &Configuration{}
 	if content, err := os.ReadFile(configPath); err == nil {
-		err = yaml.Unmarshal(content, opts)
+		err = yaml.Unmarshal(content, configuration)
 		if err != nil {
-			return fmt.Errorf("error while unmarshaling %s config file: %w", configPath, err)
+			return nil, fmt.Errorf("error while unmarshaling %s config file: %w", configPath, err)
 		}
 	}
 
 	if token := os.Getenv("SWO_API_TOKEN"); token != "" {
-		opts.Token = token
+		configuration.Token = token
 	}
 
-	if opts.Token == "" {
-		return errMissingToken
+	if configuration.Token == "" {
+		return nil, errMissingToken
 	}
 
-	return nil
+	configuration.APIURL = cCtx.String("api-url")
+	if apiUrl := os.Getenv("SWO_API_URL"); apiUrl != "" {
+		configuration.APIURL = apiUrl
+	}
+
+	return configuration, nil
 }
 
 func parseTime(input string) (string, error) {
@@ -148,6 +114,7 @@ func parseTime(input string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	if result == nil {
 		return "", ErrInvalidDateTime
 	}

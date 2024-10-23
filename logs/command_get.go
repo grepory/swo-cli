@@ -2,7 +2,16 @@ package logs
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/solarwinds/swo-cli/swosdkgo"
+	"github.com/solarwinds/swo-cli/swosdkgo/models/components"
+	"github.com/solarwinds/swo-cli/swosdkgo/models/operations"
+	"github.com/solarwinds/swo-cli/swosdkgo/models/sdkerrors"
 	"github.com/urfave/cli/v2"
+	"strings"
+	"time"
 )
 
 var flagsGet = []cli.Flag{
@@ -15,28 +24,94 @@ var flagsGet = []cli.Flag{
 }
 
 func runGet(cCtx *cli.Context) error {
-	opts := &Options{
-		args:       cCtx.Args().Slice(),
-		configFile: cCtx.String("config"),
-		group:      cCtx.String("group"),
-		system:     cCtx.String("system"),
-		maxTime:    cCtx.String("max-time"),
-		minTime:    cCtx.String("min-time"),
-		json:       cCtx.Bool("json"),
-		follow:     cCtx.Bool("follow"),
-		APIURL:     cCtx.String("api-url"),
-		Token:      cCtx.String("api-token"),
+	config, err := configure(cCtx)
+	sdk := swosdkgo.New(
+		swosdkgo.WithSecurity(config.Token),
+		swosdkgo.WithServerURL(config.APIURL))
+
+	req := operations.SearchLogsRequest{}
+
+	filter := strings.Join(cCtx.Args().Slice(), " ")
+	fmt.Println(filter)
+	if filter != "" {
+		req.Filter = &filter
 	}
-	if err := opts.Init(cCtx.Args().Slice()); err != nil {
-		return err
+
+	group := cCtx.String("group")
+	if group != "" {
+		req.Group = &group
 	}
-	client, err := NewClient(opts)
+
+	system := cCtx.String("system")
+	if system == "" {
+		filter = fmt.Sprintf("host:%s", system)
+		req.Filter = &filter
+	}
+
+	maxTime := cCtx.String("max-time")
+	if maxTime != "" {
+		result, err := parseTime(maxTime)
+		if err != nil {
+			return errors.Join(errMaxTimeFlag, err)
+		}
+
+		req.EndTime = &result
+	}
+
+	minTime := cCtx.String("min-time")
+	if minTime != "" {
+		result, err := parseTime(minTime)
+		if err != nil {
+			return errors.Join(errMinTimeFlag, err)
+		}
+
+		req.StartTime = &result
+	}
+
+	follow := cCtx.Bool("follow")
+	if follow {
+		result, err := parseTime(time.Now().Add(-10 * time.Second).Format(time.RFC3339))
+		if err != nil {
+			return errors.Join(errMaxTimeFlag, err)
+		}
+
+		req.EndTime = &result
+	}
+
+	jsonOut := cCtx.Bool("json")
+
+	resp, err := sdk.Logs.SearchLogs(context.Background(), req)
 	if err != nil {
+		sdkError := err.(*sdkerrors.SDKError)
+		fmt.Println(sdkError.RawResponse.Request.URL)
 		return err
 	}
 
-	if err = client.Run(context.Background()); err != nil {
+	logEvents := resp.GetObject().GetLogs()
+	if err := printResult(logEvents, jsonOut); err != nil {
 		return err
+	}
+
+	if follow {
+		for {
+			next, err := resp.Next()
+			if err != nil {
+				sdkError := err.(*sdkerrors.SDKError)
+				fmt.Println(sdkError.RawResponse.Request.URL)
+				return err
+			}
+
+			if err := printResult(next.GetObject().GetLogs(), jsonOut); err != nil {
+				return err
+			}
+
+			pageInfo := next.GetObject().GetPageInfo()
+			fmt.Println(pageInfo)
+			if pageInfo.GetNextPage() == "" {
+				time.Sleep(2 * time.Second)
+				continue
+			}
+		}
 	}
 
 	return nil
@@ -60,4 +135,28 @@ EXAMPLES:
 `,
 		Action: runGet,
 	}
+}
+
+func printResult(logs []components.LogsEvent, jsonOut bool) error {
+	for _, l := range logs {
+		if jsonOut {
+			log, err := json.Marshal(l)
+			if err != nil {
+				return err
+			}
+
+			fmt.Println(string(log))
+		} else {
+			t, err := time.Parse(time.RFC3339, l.Time)
+			if err != nil {
+				return err
+			}
+
+			if _, err = fmt.Printf("%s %s %s %s\n", t.Format("Jan 02 15:04:05"), l.Hostname, l.Program, l.Message); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
