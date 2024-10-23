@@ -8,7 +8,6 @@ import (
 	"github.com/solarwinds/swo-cli/swosdkgo"
 	"github.com/solarwinds/swo-cli/swosdkgo/models/components"
 	"github.com/solarwinds/swo-cli/swosdkgo/models/operations"
-	"github.com/solarwinds/swo-cli/swosdkgo/models/sdkerrors"
 	"github.com/urfave/cli/v2"
 	"strings"
 	"time"
@@ -43,7 +42,7 @@ func runGet(cCtx *cli.Context) error {
 	}
 
 	system := cCtx.String("system")
-	if system == "" {
+	if system != "" {
 		filter = fmt.Sprintf("host:%s", system)
 		req.Filter = &filter
 	}
@@ -72,18 +71,17 @@ func runGet(cCtx *cli.Context) error {
 	if follow {
 		result, err := parseTime(time.Now().Add(-10 * time.Second).Format(time.RFC3339))
 		if err != nil {
-			return errors.Join(errMaxTimeFlag, err)
+			return errors.Join(errMinTimeFlag, err)
 		}
 
-		req.EndTime = &result
+		req.StartTime = &result
+		req.Direction = swosdkgo.String("forward")
 	}
 
 	jsonOut := cCtx.Bool("json")
 
 	resp, err := sdk.Logs.SearchLogs(context.Background(), req)
 	if err != nil {
-		sdkError := err.(*sdkerrors.SDKError)
-		fmt.Println(sdkError.RawResponse.Request.URL)
 		return err
 	}
 
@@ -95,12 +93,7 @@ func runGet(cCtx *cli.Context) error {
 	if follow {
 		for {
 			next, err := resp.Next()
-			metadata := next.GetHTTPMeta()
-			fmt.Println(metadata.Response)
-			fmt.Println(next.GetObject())
 			if err != nil {
-				sdkError := err.(*sdkerrors.SDKError)
-				fmt.Println(sdkError.RawResponse.Request.URL)
 				return err
 			}
 
@@ -108,10 +101,13 @@ func runGet(cCtx *cli.Context) error {
 				return err
 			}
 
+			if len(next.GetObject().GetLogs()) == 0 {
+				time.Sleep(2 * time.Second)
+			}
+
 			pageInfo := next.GetObject().GetPageInfo()
 			if pageInfo.GetNextPage() == "" {
-				time.Sleep(2 * time.Second)
-				continue
+				break
 			}
 		}
 	}
