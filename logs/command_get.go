@@ -95,6 +95,9 @@ func runGet(cCtx *cli.Context) error {
 	if follow {
 		for {
 			next, err := resp.Next()
+			metadata := next.GetHTTPMeta()
+			fmt.Println(metadata.Response)
+			fmt.Println(next.GetObject())
 			if err != nil {
 				sdkError := err.(*sdkerrors.SDKError)
 				fmt.Println(sdkError.RawResponse.Request.URL)
@@ -106,7 +109,6 @@ func runGet(cCtx *cli.Context) error {
 			}
 
 			pageInfo := next.GetObject().GetPageInfo()
-			fmt.Println(pageInfo)
 			if pageInfo.GetNextPage() == "" {
 				time.Sleep(2 * time.Second)
 				continue
