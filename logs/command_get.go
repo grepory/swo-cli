@@ -85,24 +85,30 @@ func runGet(cCtx *cli.Context) error {
 		return err
 	}
 
-	for {
-		logEvents := resp.GetObject().GetLogs()
-		if err := printResult(logEvents, jsonOut); err != nil {
-			return err
-		}
+	if resp.Object != nil {
+		for {
+			logEvents := resp.GetObject().GetLogs()
+			if err := printResult(logEvents, jsonOut); err != nil {
+				return err
+			}
 
-		pageInfo := resp.GetObject().GetPageInfo()
-		if pageInfo.GetNextPage() == "" {
-			break
-		}
+			pageInfo := resp.GetObject().GetPageInfo()
+			if pageInfo.GetNextPage() == "" {
+				break
+			}
 
-		if follow && len(resp.GetObject().GetLogs()) == 0 {
-			time.Sleep(2 * time.Second)
-		}
+			if follow && len(resp.GetObject().GetLogs()) == 0 {
+				time.Sleep(2 * time.Second)
+			}
 
-		resp, err = resp.Next()
-		if err != nil {
-			return err
+			resp, err = resp.Next()
+			if err != nil {
+				return err
+			}
+
+			if resp == nil {
+				break
+			}
 		}
 	}
 
