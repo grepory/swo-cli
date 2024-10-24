@@ -33,18 +33,18 @@ func runGet(cCtx *cli.Context) error {
 	filter := strings.Join(cCtx.Args().Slice(), " ")
 	fmt.Println(filter)
 	if filter != "" {
-		req.Filter = &filter
+		req.Filter = swosdkgo.String(filter)
 	}
 
 	group := cCtx.String("group")
 	if group != "" {
-		req.Group = &group
+		req.Group = swosdkgo.String(group)
 	}
 
 	system := cCtx.String("system")
 	if system != "" {
-		filter = fmt.Sprintf("host:%s", system)
-		req.Filter = &filter
+		filter = fmt.Sprintf("%s host:%s", filter, system)
+		req.Filter = swosdkgo.String(filter)
 	}
 
 	maxTime := cCtx.String("max-time")
@@ -54,7 +54,7 @@ func runGet(cCtx *cli.Context) error {
 			return errors.Join(errMaxTimeFlag, err)
 		}
 
-		req.EndTime = &result
+		req.EndTime = swosdkgo.String(result)
 	}
 
 	minTime := cCtx.String("min-time")
@@ -64,7 +64,7 @@ func runGet(cCtx *cli.Context) error {
 			return errors.Join(errMinTimeFlag, err)
 		}
 
-		req.StartTime = &result
+		req.StartTime = swosdkgo.String(result)
 	}
 
 	follow := cCtx.Bool("follow")
@@ -75,7 +75,7 @@ func runGet(cCtx *cli.Context) error {
 		}
 
 		req.StartTime = &result
-		req.Direction = swosdkgo.String("forward")
+		req.Direction = swosdkgo.String("tail")
 	}
 
 	jsonOut := cCtx.Bool("json")
