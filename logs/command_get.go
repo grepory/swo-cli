@@ -74,7 +74,7 @@ func runGet(cCtx *cli.Context) error {
 			return errors.Join(errMinTimeFlag, err)
 		}
 
-		req.StartTime = &result
+		req.StartTime = swosdkgo.String(result)
 		req.Direction = swosdkgo.String("tail")
 	}
 
