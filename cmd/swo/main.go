@@ -1,9 +1,11 @@
+// Command line tool for SolarWinds Observability
 package main
 
 import (
-	"github.com/solarwinds/swo-cli/config"
 	"log"
 	"os"
+
+	"github.com/solarwinds/swo-cli/config"
 
 	"github.com/solarwinds/swo-cli/logs"
 	cli "github.com/urfave/cli/v2"
